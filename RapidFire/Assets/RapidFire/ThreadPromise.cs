@@ -5,7 +5,7 @@ using Boo.Lang.Runtime.DynamicDispatching;
 
 namespace RapidFire
 {
-    public class ThreadPromise
+    public class ThreadPromise : IPromise
     {
         public class Factory
         {
@@ -56,12 +56,25 @@ namespace RapidFire
         {
             get { return Thread != null; }
         }
+        
+        public bool IsDone { get; private set; }
 
         public Exception Exception { get; private set; }
 
         private readonly Action _task;
         private readonly Action _finally;
         private readonly Queue<Action> _thens;
+
+        public void Await()
+        {
+            while (true)
+            {
+                if (IsDone)
+                    return;
+                if(Thread.CurrentThread == RF.Current.MainThread)
+                    RF.Current.Update();
+            }
+        }
 
         private void Queue()
         {
@@ -87,6 +100,7 @@ namespace RapidFire
             {
 //                Interlocked.Decrement(ref _numThreads);
                 _finally();
+                IsDone = true;
             }
         }
     }

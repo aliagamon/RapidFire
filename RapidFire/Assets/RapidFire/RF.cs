@@ -7,8 +7,11 @@ using UnityEngine;
 namespace RapidFire
 {
 	public class RF : MonoBehaviour
-	{	
-		private const int MaxThreads = 8; // Maximum amount of active threads at same time.
+	{
+		public Thread MainThread { get; private set; }
+
+		public static int MaxThreads { get; set; }
+
 		private static int _numThreads;
 	
 		private static RF _current;
@@ -38,36 +41,39 @@ namespace RapidFire
 			_initialized = true;
 			var g = new GameObject("RapidFire");
 			_current = g.AddComponent<RF>();
-
+			_current.MainThread = Thread.CurrentThread;
 		}
 	
-		private readonly List<Action> _actions = new List<Action>();
+		private readonly List<QueuePromise> _actions = new List<QueuePromise>();
 		public struct DelayedQueueItem
 		{
 			public float Time;
 			public Action Action;
 		}
 
-		private readonly List<DelayedQueueItem> _delayed = new  List<DelayedQueueItem>();
+		private readonly List<QueuePromise> _delayed = new  List<QueuePromise>();
 
-		private readonly List<DelayedQueueItem> _currentDelayed = new List<DelayedQueueItem>();
+		private readonly List<QueuePromise> _currentDelayed = new List<QueuePromise>();
 
-		public static void QueueOnMainThread(Action action, float time = 0f)
+		public static QueuePromise QueueOnMainThread(Action action, float time = 0f)
 		{
+			var promise = new QueuePromise(action, time);
 			if(Math.Abs(time) > Utilities.Math.ToLerance)
 			{
 				lock(Current._delayed)
 				{
-					Current._delayed.Add(new DelayedQueueItem { Time = Time.time + time, Action = action});
+					Current._delayed.Add(promise);
 				}
 			}
 			else
 			{
 				lock (Current._actions)
 				{
-					Current._actions.Add(action);
+					Current._actions.Add(promise);
 				}
 			}
+
+			return promise;
 		}
 	
 		public static ThreadPromise RunAsync(Action a)
@@ -116,10 +122,15 @@ namespace RapidFire
 		}
 
 
-		private readonly List<Action> _currentActions = new List<Action>();
-	
+		private readonly List<QueuePromise> _currentActions = new List<QueuePromise>();
+
+		static RF()
+		{
+			MaxThreads = 8;
+		}
+
 		// Update is called once per frame
-		private void Update()
+		public void Update()
 		{
 			lock (_actions)
 			{
@@ -129,7 +140,7 @@ namespace RapidFire
 			}
 			foreach(var a in _currentActions)
 			{
-				a();
+				a.Launch();
 			}
 			lock(_delayed)
 			{
@@ -140,7 +151,7 @@ namespace RapidFire
 			}
 			foreach(var delayed in _currentDelayed)
 			{
-				delayed.Action();
+				delayed.Launch();
 			}
 		
 		
