@@ -11,7 +11,7 @@ namespace TestCases
 		{
 			var promise = RF.RunAsync(() =>
 			{
-				Debug.unityLogger.Log("From rapid fire!");
+				Debug.Log("From rapid fire!");
 //					transform.Rotate(10, 10, 10, Space.Self);
 			});
 			StartCoroutine(Check(promise));
@@ -21,7 +21,7 @@ namespace TestCases
 		{
 			while (true)
 			{
-				Debug.unityLogger.Log(promise.Launched);
+				Debug.Log(promise.Launched);
 				yield return null;
 			}
 		}
